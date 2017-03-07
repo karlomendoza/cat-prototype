@@ -6,7 +6,10 @@ import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
 import javax.persistence.Id;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
 @Entity(name="news")
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class News {
 	@Id
 	@GeneratedValue(strategy=GenerationType.IDENTITY)
@@ -23,6 +26,10 @@ public class News {
 		
 	}
 
+	public News(String author, String news) {
+		this.author = author;
+		this.news = news;
+	}
 
 	public News(Integer id, String author, String news) {
 		this.id = id;
