@@ -1,4 +1,4 @@
-package cap.models;
+package com.cap.models;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 
