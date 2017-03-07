@@ -1,4 +1,4 @@
-package com.example.entities;
+package cap.models;
 
 import javax.persistence.Column;
 import javax.persistence.Entity;
