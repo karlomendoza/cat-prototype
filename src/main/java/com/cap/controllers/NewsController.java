@@ -1,5 +1,6 @@
 package com.cap.controllers;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import javax.transaction.Transactional;
@@ -16,6 +17,8 @@ import com.cap.models.News;
 import com.cap.models.NewsRepository;
 
 import redis.clients.jedis.Jedis;
+import redis.clients.jedis.JedisPool;
+import redis.clients.jedis.exceptions.JedisConnectionException;
 
 @RestController
 @RequestMapping("/news")
@@ -23,6 +26,9 @@ public class NewsController {
 
 	@Autowired
 	private NewsRepository newsRepository;
+	
+	@Autowired
+	private JedisPool jedisPool;
 	
 	@GetMapping
 	@RequestMapping
@@ -35,17 +41,17 @@ public class NewsController {
 	@RequestMapping("/getAllCached")
 	@CrossOrigin
 	public List<String> getNewsCached() {
-		Jedis jedis = new Jedis();
 		
 		List<News> allNews;
-		List<String> response = jedis.lrange("allNews", 0, -1);
-		if(response == null || response.isEmpty()){
-			allNews = newsRepository.findAll();
-			allNews.forEach(news -> jedis.lpush("allNews", news.toString()));
+		List<String> response = new ArrayList<>();
+		try(Jedis jedis = jedisPool.getResource()){
 			response = jedis.lrange("allNews", 0, -1);
+			if(response == null || response.isEmpty()){
+				allNews = newsRepository.findAll();
+				allNews.forEach(news -> jedis.lpush("allNews", news.toString()));
+				response = jedis.lrange("allNews", 0, -1);
+			}
 		}
-		jedis.close();
-		
 		return response;
 	}
 	
@@ -65,17 +71,14 @@ public class NewsController {
 	@RequestMapping("/create/{author}/{news}")
 	public News create(@PathVariable("author") String author, 
 						@PathVariable("news") String news ) {
-		
-		Jedis jedis = new Jedis();
-		
-		News newNews = newsRepository.saveAndFlush(new News(author, news));
-		
-		List<String> response = jedis.lrange("allNews", 0, 1);
-		if(response != null && !response.isEmpty()){
-			jedis.lpush("allNews", newNews.toString());
-		}
-		jedis.close();
 
+		News newNews = newsRepository.saveAndFlush(new News(author, news));
+		try(Jedis jedis = jedisPool.getResource()){
+			List<String> response = jedis.lrange("allNews", 0, 1);
+			if(response != null && !response.isEmpty()){
+				jedis.lpush("allNews", newNews.toString());
+			}
+		}
 		return newNews;
 	}
 
