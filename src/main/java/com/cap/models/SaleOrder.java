@@ -1,40 +1,46 @@
 package com.cap.models;
 
+import java.util.List;
+
 public class SaleOrder {
-
-	private Integer idProduct;
 	
-	private Integer quantity;
+	private Integer orderNumber;
 	
-	private Double price;
+	private String customerName;
+	
+	List<OrderProduct> products;
+	
+	private Double total;
 
-	public SaleOrder(Integer idProduct, Integer quantity, Double price) {
-		this.idProduct = idProduct;
-		this.quantity = quantity;
-		this.price = price;
+	public Integer getOrderNumber() {
+		return orderNumber;
 	}
 
-	public Integer getIdProduct() {
-		return idProduct;
+	public void setOrderNumber(Integer orderNumber) {
+		this.orderNumber = orderNumber;
 	}
 
-	public void setIdProduct(Integer idProduct) {
-		this.idProduct = idProduct;
+	public String getCustomerName() {
+		return customerName;
 	}
 
-	public Integer getQuantity() {
-		return quantity;
+	public void setCustomerName(String customerName) {
+		this.customerName = customerName;
 	}
 
-	public void setQuantity(Integer quantity) {
-		this.quantity = quantity;
+	public List<OrderProduct> getProducts() {
+		return products;
 	}
 
-	public Double getPrice() {
-		return price;
+	public void setProducts(List<OrderProduct> products) {
+		this.products = products;
 	}
 
-	public void setPrice(Double price) {
-		this.price = price;
+	public Double getTotal() {
+		return total;
+	}
+
+	public void setTotal(Double total) {
+		this.total = total;
 	}
 }

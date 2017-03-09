@@ -9,9 +9,9 @@ import javax.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.cap.models.Order;
@@ -21,7 +21,6 @@ import com.cap.models.SaleOrder;
 
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPool;
-import redis.clients.jedis.exceptions.JedisConnectionException;
 
 @RestController
 @RequestMapping
@@ -72,37 +71,37 @@ public class OrderController {
 //	}
 	
 	@Transactional
-	@PostMapping
 	@CrossOrigin
-	@RequestMapping("/order")
+	@RequestMapping(method = RequestMethod.POST, value = "/order")
 //	public Order create(@PathVariable("id") Integer id,
 //						@PathVariable("description") String description, 
 //						@PathVariable("inventory") Integer inventory,
 //						@PathVariable("price") Double price,
 //						@PathVariable("products") List<SaleOrder> saleOrders) {
 
-	public boolean create(){
-		List<SaleOrder> saleOrders = new ArrayList<>();
-		saleOrders.add(new SaleOrder(1, 2, 5.5));
-		saleOrders.add(new SaleOrder(2, 2, 5.5));
+	public boolean create(@RequestBody SaleOrder saleOrder){
+//		List<SaleOrder> saleOrders = new ArrayList<>();
+//		saleOrders.add(new SaleOrder(1, 2, 5.5));
+//		saleOrders.add(new SaleOrder(2, 2, 5.5));
+
 		
-		Integer id = (int) Math.floor(Math.random()*10000);
-		Date date = new Date();
-		Double total = 50D;
-		String user = "karlo";
+//		Integer id = (int) Math.floor(Math.random()*10000);
+//		Date date = new Date();
+//		Double total = 50D;
+//		String user = "karlo";
 		
 		
 		////aquí empieza logica normal
 		
-		Order order = new Order(id, date, user, total);
+		Order order = new Order(saleOrder.getOrderNumber(), new Date(), saleOrder.getCustomerName(), saleOrder.getTotal());
 		
 		order.setOrderProducts(new ArrayList<>());
-		for (SaleOrder saleOrder : saleOrders) {
+		for (OrderProduct orderProduct : saleOrder.getProducts()) {
 			OrderProduct op = new OrderProduct();
 			op.setOrder(order);
-			op.setIdProduct(saleOrder.getIdProduct());
-			op.setQuantity(saleOrder.getQuantity());
-			op.setPrice(saleOrder.getPrice());
+			op.setIdProduct(orderProduct.getIdProduct());
+			op.setQuantity(orderProduct.getQuantity());
+			op.setPrice(orderProduct.getPrice());
 			order.getOrderProducts().add(op);
 		}
 		
