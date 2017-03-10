@@ -1,6 +1,5 @@
 package com.cap.controllers;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import javax.transaction.Transactional;
@@ -18,10 +17,8 @@ import com.cap.models.ProductRepository;
 
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPool;
-import redis.clients.jedis.exceptions.JedisConnectionException;
 
 @RestController
-@RequestMapping("/avail")
 public class ProductController {
 
 	@Autowired
@@ -29,37 +26,34 @@ public class ProductController {
 	
 	@Autowired
 	private JedisPool jedisPool;
-	
-//	@GetMapping
-//	@RequestMapping("/getAllCached")
-//	@CrossOrigin
-//	public List<String> getProductsCached() {
-//		
-//		List<Product> allProducts;
-//		List<String> response = new ArrayList<>();
-//		try(Jedis jedis = jedisPool.getResource()){
-//			response = jedis.lrange("allProducts", 0, -1);
-//			if(response == null || response.isEmpty()){
-//				allProducts = productRepository.findAll();
-//				allProducts.forEach(product -> jedis.lpush("allProducts", product.toString()));
-//				response = jedis.lrange("allProducts", 0, -1);
-//			}
-//		} catch (JedisConnectionException ex){
-//			allProducts = productRepository.findAll();
-//			for (Product product: allProducts) {
-//				response.add(product.toString());
-//			}
-//		}
-//		return response;
-//	}
+
 	
 	@Transactional
 	@GetMapping
-	@RequestMapping("/{id}")
+	@RequestMapping("/avail/{id}")
 	@CrossOrigin
-	public Integer getProducts(@PathVariable("id") int id) {
-		Product product = productRepository.getOne(id);
-		return product.getInventory();
+	public Integer getProductAvail(@PathVariable("id") int id) {
+		
+		String response;
+		try(Jedis jedis = jedisPool.getResource()){
+			response = jedis.get("product_avail_" + id);
+		}
+		
+		return Integer.parseInt(response);
+	}
+	
+	@Transactional
+	@GetMapping
+	@RequestMapping("/product/{id}")
+	@CrossOrigin
+	public String getProduct(@PathVariable("id") int id) {
+		
+		String product;
+		try(Jedis jedis = jedisPool.getResource()){
+			product = jedis.get("product_" + id);
+		}
+		
+		return product;
 	}
 	
 	@Transactional

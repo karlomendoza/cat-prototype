@@ -1,5 +1,6 @@
 package com.cap.controllers;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -17,7 +18,14 @@ import org.springframework.web.bind.annotation.RestController;
 import com.cap.models.Order;
 import com.cap.models.OrderProduct;
 import com.cap.models.OrderRepository;
+import com.cap.models.Product;
+import com.cap.models.ProductRepository;
 import com.cap.models.SaleOrder;
+import com.cap.util.Util;
+import com.fasterxml.jackson.core.JsonParseException;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonMappingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPool;
@@ -28,73 +36,50 @@ public class OrderController {
 
 	@Autowired
 	private OrderRepository orderRepository;
-	
+
+	@Autowired
+	private ProductRepository productRepository;
+
 	@Autowired
 	private JedisPool jedisPool;
 	
+	private static ObjectMapper mapper = new ObjectMapper();
+
 	@GetMapping
 	@RequestMapping("/orderList")
 	@CrossOrigin
-	public List<Order> getOrders() {
-		return avoidCicles(orderRepository.findAll());
+	public List<Order> getOrders() throws JsonParseException, JsonMappingException, IOException {
+		List<String> allOrders = new ArrayList<>();
+		List<Order> orders = new ArrayList<>();
+		
+		try (Jedis jedis = jedisPool.getResource()) {
+			allOrders = jedis.lrange("allOrders", 0, -1);
+		}
+		for (String order: allOrders) {
+			orders.add(mapper.readValue(order, Order.class));
+		}
+		
+		return orders;
 	}
-//	
-//	@GetMapping
-//	@RequestMapping("/getAllCached")
-//	@CrossOrigin
-//	public List<String> getOrdersCached() {
-//		
-//		List<Order> allOrders;
-//		List<String> response = new ArrayList<>();
-//		try(Jedis jedis = jedisPool.getResource()){
-//			response = jedis.lrange("allOrders", 0, -1);
-//			if(response == null || response.isEmpty()){
-//				allOrders = orderRepository.findAll();
-//				allOrders.forEach(order -> jedis.lpush("allOrders", order.toString()));
-//				response = jedis.lrange("allOrders", 0, -1);
-//			}
-//		} catch (JedisConnectionException ex){
-//			allOrders = orderRepository.findAll();
-//			for (Order order: allOrders) {
-//				response.add(order.toString());
-//			}
-//		}
-//		return response;
-//	}
-//	
-//	@Transactional
-//	@GetMapping
-//	@RequestMapping("/find/{id}")
-//	@CrossOrigin
-//	public Order getOrder(@PathVariable("id") int id) {
-//		return avoidCicles(orderRepository.getOne(id));
-//	}
-	
+
 	@Transactional
 	@CrossOrigin
 	@RequestMapping(method = RequestMethod.POST, value = "/order")
-//	public Order create(@PathVariable("id") Integer id,
-//						@PathVariable("description") String description, 
-//						@PathVariable("inventory") Integer inventory,
-//						@PathVariable("price") Double price,
-//						@PathVariable("products") List<SaleOrder> saleOrders) {
+	public boolean create(@RequestBody SaleOrder saleOrder) throws JsonProcessingException {
 
-	public boolean create(@RequestBody SaleOrder saleOrder){
-//		List<SaleOrder> saleOrders = new ArrayList<>();
-//		saleOrders.add(new SaleOrder(1, 2, 5.5));
-//		saleOrders.add(new SaleOrder(2, 2, 5.5));
+		// check availability
+		try (Jedis jedis = jedisPool.getResource()) {
+			for (OrderProduct orderProduct : saleOrder.getProducts()) {
+				Integer availability = Integer.parseInt(jedis.get("product_avail_" + orderProduct.getIdProduct()));
+				if (availability < orderProduct.getQuantity()) {
+					return false;
+				}
+			}
+		}
 
-		
-//		Integer id = (int) Math.floor(Math.random()*10000);
-//		Date date = new Date();
-//		Double total = 50D;
-//		String user = "karlo";
-		
-		
-		////aquí empieza logica normal
-		
-		Order order = new Order(saleOrder.getOrderNumber(), new Date(), saleOrder.getCustomerName(), saleOrder.getTotal());
-		
+		Order order = new Order(saleOrder.getOrderNumber(), new Date(), saleOrder.getCustomerName(),
+				saleOrder.getTotal());
+
 		order.setOrderProducts(new ArrayList<>());
 		for (OrderProduct orderProduct : saleOrder.getProducts()) {
 			OrderProduct op = new OrderProduct();
@@ -104,30 +89,24 @@ public class OrderController {
 			op.setPrice(orderProduct.getPrice());
 			order.getOrderProducts().add(op);
 		}
+
+		orderRepository.saveAndFlush(order);
 		
-		Order newOrder = orderRepository.saveAndFlush(order);
-		
-		try(Jedis jedis = jedisPool.getResource()){
-			List<String> response = jedis.lrange("allOrders", 0, 1);
-			if(response != null && !response.isEmpty()){
-				jedis.lpush("allOrders", newOrder.toString());
+		try (Jedis jedis = jedisPool.getResource()) {
+			for (OrderProduct orderProduct : saleOrder.getProducts()) {
+				Integer availability = Integer.parseInt(jedis.get("product_avail_" + orderProduct.getIdProduct()));
+				Integer newAvailability = availability - orderProduct.getQuantity();
+				jedis.set("product_avail_" + orderProduct.getIdProduct(), newAvailability.toString());
+
+				Product product = productRepository.getOne(orderProduct.getIdProduct());
+				product.setInventory(newAvailability);
+				productRepository.saveAndFlush(product);
 			}
+			ObjectMapper mapper = new ObjectMapper();
+			jedis.lpush("allOrders", mapper.writeValueAsString(Util.avoidCicles(order)));
 		}
 		return true;
 	}
 	
-	private List<Order> avoidCicles(List<Order> orders){
-		for (Order order : orders) {
-			avoidCicles(order);
-		}
-		return orders;
-	}
 	
-	private Order avoidCicles(Order order){
-		for (OrderProduct orderProduct : order.getOrderProducts()) {
-			orderProduct.setOrder(null);
-		}
-		return order;
-	}
-
 }
