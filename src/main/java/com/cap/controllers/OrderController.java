@@ -9,7 +9,6 @@ import javax.transaction.Transactional;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.CrossOrigin;
-import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
@@ -27,6 +26,8 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import io.swagger.annotations.ApiOperation;
+import io.swagger.annotations.ApiParam;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPool;
 
@@ -45,9 +46,9 @@ public class OrderController {
 	
 	private static ObjectMapper mapper = new ObjectMapper();
 
-	@GetMapping
-	@RequestMapping("/orderList")
 	@CrossOrigin
+	@RequestMapping(value = "/orderList", method = RequestMethod.GET)
+	@ApiOperation(value = "Get a list of orders")
 	public List<Order> getOrders() throws JsonParseException, JsonMappingException, IOException {
 		List<String> allOrders = new ArrayList<>();
 		List<Order> orders = new ArrayList<>();
@@ -65,7 +66,10 @@ public class OrderController {
 	@Transactional
 	@CrossOrigin
 	@RequestMapping(method = RequestMethod.POST, value = "/order")
-	public boolean create(@RequestBody SaleOrder saleOrder) throws JsonProcessingException {
+	@ApiOperation(value = "Create an order")
+	public boolean create(@ApiParam(value = "Object containing"
+			+ " the details of a specific sale; i.e., information about the customer, products, etc.", required = true) 
+			@RequestBody SaleOrder saleOrder) throws JsonProcessingException {
 
 		// check availability
 		try (Jedis jedis = jedisPool.getResource()) {
