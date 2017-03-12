@@ -1,5 +1,6 @@
 package com.cap.models;
 
+import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
 
@@ -9,39 +10,40 @@ import javax.persistence.Entity;
 import javax.persistence.FetchType;
 import javax.persistence.Id;
 import javax.persistence.OneToMany;
+import javax.persistence.Transient;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
-@Entity(name="orders")
-@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+@Entity(name = "orders")
+@JsonIgnoreProperties(ignoreUnknown = true, value = { "hibernateLazyInitializer", "handler" })
 public class Order {
-	
+
 	@Id
-	@Column(name="id")
+	@Column(name = "id")
 	private Integer id;
-	
-	@Column(name="order_date")
+
+	@Column(name = "order_date")
 	private Date date;
-	
-	@Column(name="user_name")
+
+	@Column(name = "user_name")
 	private String userName;
-	
-	@Column(name="total")
+
+	@Column(name = "total")
 	private Double total;
 
-	@OneToMany(fetch=FetchType.EAGER, cascade=CascadeType.ALL, mappedBy = "order")
+	@OneToMany(fetch = FetchType.EAGER, cascade = CascadeType.ALL, mappedBy = "order")
 	List<OrderProduct> orderProducts;
-	
-	public Order(){
-		
+
+	public Order() {
+
 	}
-	
+
 	public Order(Date date, String user, Double total) {
 		this.date = date;
 		this.userName = user;
 		this.total = total;
 	}
-	
+
 	public Order(Integer id, Date date, String userName, Double total) {
 		this.id = id;
 		this.date = date;
@@ -107,6 +109,13 @@ public class Order {
 
 	public Date getDate() {
 		return date;
+	}
+
+	@Transient
+	public String getFormatedDate() {
+		SimpleDateFormat sdf = new SimpleDateFormat("MM/dd/yyyy");
+		return sdf.format(date);
+
 	}
 
 	public void setDate(Date date) {

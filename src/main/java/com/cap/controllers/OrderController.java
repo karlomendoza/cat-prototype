@@ -3,7 +3,10 @@ package com.cap.controllers;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import javax.transaction.Transactional;
 
@@ -16,10 +19,12 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.cap.models.Order;
 import com.cap.models.OrderProduct;
+import com.cap.models.OrderProductRepository;
 import com.cap.models.OrderRepository;
 import com.cap.models.Product;
 import com.cap.models.ProductRepository;
 import com.cap.models.SaleOrder;
+import com.cap.objects.SalesByProduct;
 import com.cap.util.Util;
 import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -27,7 +32,6 @@ import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import io.swagger.annotations.ApiOperation;
-import io.swagger.annotations.ApiParam;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPool;
 
@@ -42,8 +46,11 @@ public class OrderController {
 	private ProductRepository productRepository;
 
 	@Autowired
+	private OrderProductRepository orderproductRepository;
+
+	@Autowired
 	private JedisPool jedisPool;
-	
+
 	private static ObjectMapper mapper = new ObjectMapper();
 
 	@CrossOrigin
@@ -52,24 +59,70 @@ public class OrderController {
 	public List<Order> getOrders() throws JsonParseException, JsonMappingException, IOException {
 		List<String> allOrders = new ArrayList<>();
 		List<Order> orders = new ArrayList<>();
-		
+
 		try (Jedis jedis = jedisPool.getResource()) {
 			allOrders = jedis.lrange("allOrders", 0, -1);
 		}
-		for (String order: allOrders) {
+		for (String order : allOrders) {
 			orders.add(mapper.readValue(order, Order.class));
 		}
-		
+
 		return orders;
+	}
+
+	@CrossOrigin
+	@RequestMapping(value = "/salesByDay", method = RequestMethod.GET)
+	@ApiOperation(value = "Get a list of earnings by day")
+	public Map<String, Double> getSalesByDay() throws JsonParseException, JsonMappingException, IOException {
+
+		List<String> allOrders = new ArrayList<>();
+		List<Order> orders = new ArrayList<>();
+
+		try (Jedis jedis = jedisPool.getResource()) {
+			allOrders = jedis.lrange("allOrders", 0, -1);
+		}
+
+		for (String order : allOrders) {
+			orders.add(mapper.readValue(order, Order.class));
+		}
+
+		Map<String, Double> counting = orders.stream()
+				.collect(Collectors.groupingBy(Order::getFormatedDate, Collectors.summingDouble(Order::getTotal)));
+	
+		return counting;
+	}
+
+	@CrossOrigin
+	@RequestMapping(value = "/salesByProduct", method = RequestMethod.GET)
+	@ApiOperation(value = "Get a list of sales by product, you get product, amount of product sold, and earnings by product")
+	public List<SalesByProduct> getSalesByProduct() throws JsonParseException, JsonMappingException, IOException {
+
+		List<OrderProduct> ops = orderproductRepository.findAll();
+		Map<Integer, SalesByProduct> salesByProduct = new HashMap<>();
+
+		SalesByProduct sbp;
+		for (OrderProduct orderProduct : ops) {
+			if (salesByProduct.containsKey(orderProduct.getIdProduct()))
+				sbp = salesByProduct.get(orderProduct.getIdProduct());
+			else {
+				sbp = new SalesByProduct();
+				try (Jedis jedis = jedisPool.getResource()) {
+					String product = jedis.get("product_" + orderProduct.getIdProduct());
+					sbp.setProductDescription(mapper.readValue(product, Product.class).getDescription());
+				}
+				salesByProduct.put(orderProduct.getIdProduct(), sbp);
+			}
+			sbp.addSale(orderProduct);
+		}
+
+		return new ArrayList<>(salesByProduct.values());
 	}
 
 	@Transactional
 	@CrossOrigin
 	@RequestMapping(method = RequestMethod.POST, value = "/order")
 	@ApiOperation(value = "Create an order")
-	public boolean create(@ApiParam(value = "Object containing"
-			+ " the details of a specific sale; i.e., information about the customer, products, etc.", required = true) 
-			@RequestBody SaleOrder saleOrder) throws JsonProcessingException {
+	public boolean create(@RequestBody SaleOrder saleOrder) throws JsonProcessingException {
 
 		// check availability
 		try (Jedis jedis = jedisPool.getResource()) {
@@ -95,7 +148,7 @@ public class OrderController {
 		}
 
 		orderRepository.saveAndFlush(order);
-		
+
 		try (Jedis jedis = jedisPool.getResource()) {
 			for (OrderProduct orderProduct : saleOrder.getProducts()) {
 				Integer availability = Integer.parseInt(jedis.get("product_avail_" + orderProduct.getIdProduct()));
@@ -111,6 +164,5 @@ public class OrderController {
 		}
 		return true;
 	}
-	
-	
+
 }
