@@ -12,7 +12,7 @@ import javax.persistence.ManyToOne;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 @Entity(name = "order_product")
-@JsonIgnoreProperties({ "hibernateLazyInitializer", "handler" })
+@JsonIgnoreProperties(ignoreUnknown = true, value = { "hibernateLazyInitializer", "handler" })
 public class OrderProduct {
 
 	@Id
@@ -45,6 +45,10 @@ public class OrderProduct {
 		this.quantity = quantity;
 		this.order = order;
 		
+	}
+	
+	public Double getOrderProductSalesTotal(){
+		return price*quantity;
 	}
 
 	@Override

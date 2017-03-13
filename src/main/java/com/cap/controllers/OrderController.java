@@ -27,7 +27,6 @@ import com.cap.models.SaleOrder;
 import com.cap.objects.SalesByProduct;
 import com.cap.util.Util;
 import com.fasterxml.jackson.core.JsonParseException;
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -88,7 +87,7 @@ public class OrderController {
 
 		Map<String, Double> counting = orders.stream()
 				.collect(Collectors.groupingBy(Order::getFormatedDate, Collectors.summingDouble(Order::getTotal)));
-	
+
 		return counting;
 	}
 
@@ -122,13 +121,16 @@ public class OrderController {
 	@CrossOrigin
 	@RequestMapping(method = RequestMethod.POST, value = "/order")
 	@ApiOperation(value = "Create an order")
-	public boolean create(@RequestBody SaleOrder saleOrder) throws JsonProcessingException {
+	public boolean create(@RequestBody SaleOrder saleOrder) throws IOException {
 
-		// check availability
+		// check availability && price, must be the same
 		try (Jedis jedis = jedisPool.getResource()) {
 			for (OrderProduct orderProduct : saleOrder.getProducts()) {
-				Integer availability = Integer.parseInt(jedis.get("product_avail_" + orderProduct.getIdProduct()));
-				if (availability < orderProduct.getQuantity()) {
+				Product product = mapper.readValue(jedis.get("product_" + orderProduct.getIdProduct()), Product.class);
+				if (product.getInventory() < orderProduct.getQuantity()) {
+					return false;
+				}
+				if (!product.getPrice().equals(orderProduct.getPrice())) {
 					return false;
 				}
 			}
@@ -147,6 +149,10 @@ public class OrderController {
 			order.getOrderProducts().add(op);
 		}
 
+		// check total amounts equals product price*quantity
+		if (!validate(order))
+			return false;
+
 		orderRepository.saveAndFlush(order);
 
 		try (Jedis jedis = jedisPool.getResource()) {
@@ -162,6 +168,18 @@ public class OrderController {
 			ObjectMapper mapper = new ObjectMapper();
 			jedis.lpush("allOrders", mapper.writeValueAsString(Util.avoidCicles(order)));
 		}
+		return true;
+	}
+
+	private boolean validate(Order order) {
+		Double total = order.getTotal();
+
+		Double saleTotal = order.getOrderProducts().stream()
+				.collect(Collectors.summingDouble(OrderProduct::getOrderProductSalesTotal));
+
+		if (!total.equals(saleTotal))
+			return false;
+
 		return true;
 	}
 
