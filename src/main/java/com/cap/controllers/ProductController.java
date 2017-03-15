@@ -1,5 +1,7 @@
 package com.cap.controllers;
 
+import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 
 import javax.transaction.Transactional;
@@ -13,6 +15,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.cap.models.Product;
 import com.cap.models.ProductRepository;
+import com.fasterxml.jackson.core.JsonParseException;
+import com.fasterxml.jackson.databind.JsonMappingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
@@ -27,7 +32,8 @@ public class ProductController {
 	
 	@Autowired
 	private JedisPool jedisPool;
-
+	
+	private static ObjectMapper mapper = new ObjectMapper();
 	
 	@Transactional
 	@CrossOrigin
@@ -55,6 +61,24 @@ public class ProductController {
 		}
 		
 		return product;
+	}
+	
+	@Transactional
+	@CrossOrigin
+	@RequestMapping(value = "/products", method = RequestMethod.GET)
+	@ApiOperation(value = "Get all the products")
+	public List<Product> getProducts() throws JsonParseException, JsonMappingException, IOException {
+		
+		List<String> allProducts;
+		try(Jedis jedis = jedisPool.getResource()){
+			allProducts = jedis.lrange("allProducts", 0, -1);
+		}
+		List<Product> products = new ArrayList<>();
+		for (String product : allProducts) {
+			products.add(mapper.readValue(product, Product.class));
+		}
+		
+		return products;
 	}
 	
 	@Transactional
