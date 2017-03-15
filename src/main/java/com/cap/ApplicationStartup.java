@@ -46,20 +46,17 @@ public class ApplicationStartup implements ApplicationListener<ApplicationReadyE
 	public void init(){
 		ObjectMapper mapper = new ObjectMapper();
 		try(Jedis jedis = jedisPool.getResource()){
+			jedis.flushAll();
 			List<Product> products = productRepository.findAll();
 			String response;
 			for (Product product : products) {
 				response = jedis.get("product_" + product.getId());
 				if(response == null || response.isEmpty()){
 					jedis.set("product_" + product.getId(), mapper.writeValueAsString(product));
-				}
-				
-				response = jedis.get("product_avail_" + product.getId());
-				if(response == null || response.isEmpty()){
 					jedis.set("product_avail_" + product.getId(), product.getInventory().toString());
+					jedis.lpush("allProducts", mapper.writeValueAsString(product));
 				}
 			}
-			
 			
 			List<Order> orders = orderRepository.findAll();
 			List<String> allOrders = jedis.lrange("allOrders", 0, 1);
