@@ -51,7 +51,7 @@
 	</dependencies>
 
 	<properties>
-		<start-class>cap.Application</start-class>
+		<start-class>com.cap.Application</start-class>
 		<java.version>1.8</java.version>
 	</properties>
 
