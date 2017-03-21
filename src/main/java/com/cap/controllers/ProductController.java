@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.cap.models.Product;
 import com.cap.models.ProductRepository;
 import com.fasterxml.jackson.core.JsonParseException;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -87,13 +88,15 @@ public class ProductController {
 	@ApiOperation(value = "Create a product")
 	public Product create(@ApiParam(value = "Description") @PathVariable("description") String description, 
 						@ApiParam(value = "How many products are there?") @PathVariable("inventory") Integer inventory,
-						@ApiParam(value = "Price") @PathVariable("price") Double price) {
+						@ApiParam(value = "Price") @PathVariable("price") Double price) throws JsonProcessingException {
 
 		Product newProduct = productRepository.saveAndFlush(new Product(description, inventory, price));
 		try(Jedis jedis = jedisPool.getResource()){
 			List<String> response = jedis.lrange("allProducts", 0, 1);
-			if(response != null && !response.isEmpty()){
-				jedis.lpush("allProducts", newProduct.toString());
+			if(response != null && !response.isEmpty()){				
+				jedis.set("product_" + newProduct.getId(), mapper.writeValueAsString(newProduct));
+				jedis.set("product_avail_" + newProduct.getId(), newProduct.getInventory().toString());
+				jedis.lpush("allProducts", mapper.writeValueAsString(newProduct));
 			}
 		}
 		return newProduct;
