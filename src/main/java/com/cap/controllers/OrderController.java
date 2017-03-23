@@ -163,6 +163,22 @@ public class OrderController {
 
 				Product product = productRepository.getOne(orderProduct.getIdProduct());
 				product.setInventory(newAvailability);
+
+				String productOnRedis = mapper.writeValueAsString(product);
+				jedis.set("product_" + orderProduct.getIdProduct(), productOnRedis);
+
+				// Search on allProducts until we find the product with a sale
+				// to update it's availability
+				Long allProductsSize = jedis.llen("allProducts");
+				for (long i = 0L; i < allProductsSize.intValue(); i++) {
+					String iProduct = jedis.lindex("allProducts", i);
+					Product tmpProduct = (mapper.readValue(iProduct, Product.class));
+					if (tmpProduct.getId().equals(product.getId())) {
+						jedis.lset("allProducts", i, productOnRedis);
+						break;
+					}
+				}
+
 				productRepository.saveAndFlush(product);
 			}
 			ObjectMapper mapper = new ObjectMapper();
